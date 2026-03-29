@@ -24,10 +24,10 @@
 # Example: ALL_SERVER_IPS=( "192.168.1.10" "192.168.1.11" "192.168.1.12" "192.168.1.20" )
 #
 ALL_SERVER_IPS=(
-    "192.168.1.10"    # Node 1 - Will become mysql-node-1 (Primary)
-    "192.168.1.11"    # Node 2 - Will become mysql-node-2
-    "192.168.1.12"    # Node 3 - Will become mysql-node-3
-    "192.168.1.20"    # Node 4 - Will become ProxySQL server
+    "10.104.0.5"    # Node 1 - Will become mysql-node-1 (Primary)
+    "10.104.0.6"    # Node 2 - Will become mysql-node-2
+    "10.104.0.2"    # Node 3 - Will become mysql-node-3
+    "10.104.0.4"    # Node 4 - Will become ProxySQL server
     # "192.168.1.21"   # (Optional) Node 5 - will be ignored
     # "192.168.1.22"   # (Optional) Node 6 - will be ignored
 )
@@ -46,21 +46,21 @@ MYSQL_VERSION="8.0"
 ################################################################################
 
 # Root user password (MUST change this)
-MYSQL_ROOT_PASSWORD="change_me_strong_password_123"
+MYSQL_ROOT_PASSWORD="t3p35Dcjj52SqywS"
 
 # Application user (can be used by your application)
 MYSQL_APP_USER="appuser"
-MYSQL_APP_PASSWORD="app_password_456"
+MYSQL_APP_PASSWORD="X8e5guYuUz3vL6q8"
 
 # Replication user (for internal cluster replication)
 MYSQL_REPLICATION_USER="repl_user"
-MYSQL_REPLICATION_PASSWORD="repl_password_789"
+MYSQL_REPLICATION_PASSWORD="V4SbQzMJXNypnkrC"
 
 # Remote access user (for applications, can connect from anywhere)
 # This user can connect from ANY IP (hostname: %)
 # Use this in your application code or for external connections
 REMOTE_USER="appremote"
-REMOTE_PASSWORD="remote_password_456"
+REMOTE_PASSWORD="LJpE2QEJvzC93nFQ"
 
 ################################################################################
 # PROXYSQL CONFIGURATION
@@ -68,7 +68,7 @@ REMOTE_PASSWORD="remote_password_456"
 
 # Monitor user (very minimal permissions - only SELECT from system tables)
 PROXYSQL_MONITOR_USER="monitor_user"
-PROXYSQL_MONITOR_PASSWORD="monitor_password_456"
+PROXYSQL_MONITOR_PASSWORD="v9Tv3wBj8MsqTUxs"
 
 ################################################################################
 # NETWORK & PORT CONFIGURATION
