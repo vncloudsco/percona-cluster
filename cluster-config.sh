@@ -104,7 +104,7 @@ SSH_USER="root"
 #   - /root/.ssh/id_rsa          (running as root)
 #   - /home/ubuntu/.ssh/id_rsa   (running as ubuntu user)
 #   - /home/admin/.ssh/id_rsa    (running as admin user)
-SSH_KEY_PATH="/root/.ssh/id_rsa"
+SSH_KEY_PATH="/root/.ssh/id_ed25519"
 
 # SSH port (standard SSH port)
 SSH_PORT=22
