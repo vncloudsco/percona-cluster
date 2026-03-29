@@ -243,46 +243,46 @@ install_packages_remote() {
 #!/bin/bash
 set -e
 
+# Suppress interactive prompts
+export DEBIAN_FRONTEND=noninteractive
+
 # Install prerequisite packages first
 if command -v apt-get &> /dev/null; then
     apt-get update -y
-    apt-get install -y curl gnupg wget
+    apt-get install -y curl gnupg wget lsb-release
 elif command -v yum &> /dev/null; then
     yum update -y
     yum install -y curl gnupg wget
 fi
 
-# Install Percona repository BEFORE trying to install specific packages
-if ! [ -f /etc/apt/sources.list.d/percona-release.list ] && \
-   ! [ -f /etc/yum.repos.d/percona-release.repo ]; then
-    echo "Installing Percona repository..."
+# Setup Percona repository
+echo "Setting up Percona repository..."
+
+if command -v apt-get &> /dev/null; then
+    # Ubuntu/Debian method using curl setup script
+    if ! [ -f /etc/apt/sources.list.d/percona-release.sources ]; then
+        curl -fsSL https://repo.percona.com/apt/percona-apt-key | gpg --dearmor | tee /usr/share/keyrings/percona-apt-key.gpg > /dev/null
+        
+        # Get Ubuntu version
+        UBUNTU_CODENAME=$(lsb_release -sc)
+        echo "deb [signed-by=/usr/share/keyrings/percona-apt-key.gpg] http://repo.percona.com/apt $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/percona-release.list
+        apt-get update -y
+    fi
     
-    if command -v apt-get &> /dev/null; then
-        # For Debian/Ubuntu: use percona-release package
-        if ! command -v percona-release &> /dev/null; then
-            curl -O https://repo.percona.com/apt/percona-release_latest.deb
-            dpkg -i percona-release_latest.deb
-            rm -f percona-release_latest.deb
-        fi
-        percona-release setup -y
-    elif command -v yum &> /dev/null; then
-        # For Rocky/RHEL
-        if ! command -v percona-release &> /dev/null; then
-            rpm -Uhv https://repo.percona.com/yum/percona-release-latest.noarch.rpm
-        fi
+elif command -v yum &> /dev/null; then
+    # Rocky/RHEL method
+    if ! [ -f /etc/yum.repos.d/percona-release.repo ]; then
+        rpm --import https://repo.percona.com/yum/PERCONA-PACKAGING-KEY
+        rpm -Uvh https://repo.percona.com/yum/percona-release-latest.noarch.rpm
+        yum update -y
     fi
 fi
 
-# Now update again after repo setup
-if command -v apt-get &> /dev/null; then
-    apt-get update -y
-elif command -v yum &> /dev/null; then
-    yum update -y
-fi
-
 # Install Percona XtraDB Cluster and related packages
+echo "Installing Percona XtraDB Cluster packages..."
+
 if command -v apt-get &> /dev/null; then
-    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    apt-get install -y \
         percona-server-server \
         percona-xtradb-cluster \
         percona-xtradb-cluster-server \

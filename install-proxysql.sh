@@ -216,27 +216,43 @@ install_proxysql_remote() {
 #!/bin/bash
 set -e
 
-# Update package lists
+# Suppress interactive prompts
+export DEBIAN_FRONTEND=noninteractive
+
+# Install prerequisite packages
 if command -v apt-get &> /dev/null; then
     apt-get update -y
-    apt-get install -y curl gnupg wget
+    apt-get install -y curl gnupg wget lsb-release
 elif command -v yum &> /dev/null; then
     yum update -y
     yum install -y curl gnupg wget
 fi
 
-# Install Percona repository
-if [ ! -f /etc/apt/sources.list.d/percona-release.list ] && \
-   [ ! -f /etc/yum.repos.d/percona-release.repo ]; then
-    curl https://repo.percona.com/apt/percona-release_latest.generic_deb.tar.gz -o /tmp/percona-release.tar.gz
-    cd /tmp && tar -xzf percona-release.tar.gz
-    if command -v apt-get &> /dev/null; then
-        ./percona-release/percona-release setup -y
+# Setup Percona repository for ProxySQL
+echo "Setting up Percona repository..."
+
+if command -v apt-get &> /dev/null; then
+    # Ubuntu/Debian method using curl setup script
+    if ! [ -f /etc/apt/sources.list.d/percona-release.sources ]; then
+        curl -fsSL https://repo.percona.com/apt/percona-apt-key | gpg --dearmor | tee /usr/share/keyrings/percona-apt-key.gpg > /dev/null
+        
+        # Get Ubuntu version
+        UBUNTU_CODENAME=$(lsb_release -sc)
+        echo "deb [signed-by=/usr/share/keyrings/percona-apt-key.gpg] http://repo.percona.com/apt $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/percona-release.list
+        apt-get update -y
     fi
-    rm -rf percona-release*
+    
+elif command -v yum &> /dev/null; then
+    # Rocky/RHEL method
+    if ! [ -f /etc/yum.repos.d/percona-release.repo ]; then
+        rpm --import https://repo.percona.com/yum/PERCONA-PACKAGING-KEY
+        rpm -Uvh https://repo.percona.com/yum/percona-release-latest.noarch.rpm
+        yum update -y
+    fi
 fi
 
 # Install ProxySQL
+echo "Installing ProxySQL..."
 if command -v apt-get &> /dev/null; then
     apt-get install -y proxysql
 elif command -v yum &> /dev/null; then
