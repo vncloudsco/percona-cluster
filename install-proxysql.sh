@@ -219,47 +219,137 @@ set -e
 # Suppress interactive prompts
 export DEBIAN_FRONTEND=noninteractive
 
+echo "Installing prerequisite packages..."
+
 # Install prerequisite packages
 if command -v apt-get &> /dev/null; then
     apt-get update -y
-    apt-get install -y curl gnupg wget lsb-release
+    apt-get install -y curl gnupg wget lsb-release ca-certificates
 elif command -v yum &> /dev/null; then
     yum update -y
     yum install -y curl gnupg wget
 fi
 
-# Setup Percona repository for ProxySQL
-echo "Setting up Percona repository..."
+# Setup Percona repository for ProxySQL with robust GPG key handling
+echo "Setting up Percona repository with GPG key..."
 
 if command -v apt-get &> /dev/null; then
-    # Ubuntu/Debian method using curl setup script
-    if ! [ -f /etc/apt/sources.list.d/percona-release.sources ]; then
-        curl -fsSL https://repo.percona.com/apt/percona-apt-key | gpg --dearmor | tee /usr/share/keyrings/percona-apt-key.gpg > /dev/null
-        
-        # Get Ubuntu version
-        UBUNTU_CODENAME=$(lsb_release -sc)
-        echo "deb [signed-by=/usr/share/keyrings/percona-apt-key.gpg] http://repo.percona.com/apt $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/percona-release.list
-        apt-get update -y
+    # Ubuntu/Debian: More robust GPG key import
+    KEYRING_PATH="/usr/share/keyrings/percona-apt-key.gpg"
+    REPO_FILE="/etc/apt/sources.list.d/percona-release.list"
+    
+    # Remove old repository if it exists
+    rm -f "$REPO_FILE"
+    
+    # Try multiple methods to get and import the key
+    KEY_IMPORT_SUCCESS=0
+    
+    # Method 1: Direct key import
+    if [ $KEY_IMPORT_SUCCESS -eq 0 ]; then
+        echo "Attempting key import method 1 (direct download)..."
+        if curl -fsSL https://repo.percona.com/apt/percona-apt-key | gpg --dearmor | tee "$KEYRING_PATH" > /dev/null 2>&1; then
+            KEY_IMPORT_SUCCESS=1
+            echo "✓ Key imported via method 1"
+        fi
     fi
     
+    # Method 2: Ubuntu keyserver fallback
+    if [ $KEY_IMPORT_SUCCESS -eq 0 ]; then
+        echo "Attempting key import method 2 (Ubuntu keyserver)..."
+        if gpg --no-default-keyring --keyring "$KEYRING_PATH" --keyserver keyserver.ubuntu.com --recv-keys 9334A25F8507EFA5 2>&1 | grep -q "imported\|unchanged"; then
+            KEY_IMPORT_SUCCESS=1
+            echo "✓ Key imported via method 2"
+        fi
+    fi
+    
+    # Method 3: Keys.openpgp.org fallback
+    if [ $KEY_IMPORT_SUCCESS -eq 0 ]; then
+        echo "Attempting key import method 3 (openpgp.org)..."
+        if gpg --no-default-keyring --keyring "$KEYRING_PATH" --keyserver keys.openpgp.org --recv-keys 9334A25F8507EFA5 2>&1 | grep -q "imported\|unchanged"; then
+            KEY_IMPORT_SUCCESS=1
+            echo "✓ Key imported via method 3"
+        fi
+    fi
+    
+    # Verify key was imported
+    if gpg --with-colons "$KEYRING_PATH" 2>/dev/null | grep -q "pub"; then
+        echo "✓ GPG key verification successful"
+    else
+        echo "⚠ Warning: GPG key verification inconclusive, proceeding anyway..."
+    fi
+    
+    # Add repository source
+    UBUNTU_CODENAME=$(lsb_release -sc 2>/dev/null || echo "noble")
+    echo "Adding Percona repository for Ubuntu $UBUNTU_CODENAME..."
+    echo "deb [signed-by=$KEYRING_PATH] http://repo.percona.com/apt $UBUNTU_CODENAME main" | tee "$REPO_FILE"
+    
+    # Update with new repository
+    apt-get update -y || echo "⚠ Some apt warnings occurred, continuing..."
+    
 elif command -v yum &> /dev/null; then
-    # Rocky/RHEL method
-    if ! [ -f /etc/yum.repos.d/percona-release.repo ]; then
-        rpm --import https://repo.percona.com/yum/PERCONA-PACKAGING-KEY
-        rpm -Uvh https://repo.percona.com/yum/percona-release-latest.noarch.rpm
-        yum update -y
+    # Rocky/RHEL: More direct approach
+    echo "Setting up Percona repository for Rocky/RHEL..."
+    
+    # Import GPG key
+    if rpm --import https://repo.percona.com/yum/PERCONA-PACKAGING-KEY 2>/dev/null; then
+        echo "✓ GPG key imported successfully"
+    fi
+    
+    # Add repository directly
+    if [ -d /etc/yum.repos.d ]; then
+        cat > /etc/yum.repos.d/percona-release.repo << 'REPO_CONFIG'
+[percona-release-$releasever]
+name = Percona-Release YUM repository - $releasever
+baseurl = http://repo.percona.com/yum/$releasever/$basearch
+gpgkey = https://repo.percona.com/yum/PERCONA-PACKAGING-KEY
+gpgcheck = 1
+enabled = 1
+REPO_CONFIG
+        yum update -y || echo "⚠ Some yum warnings occurred, continuing..."
     fi
 fi
 
-# Install ProxySQL
+# Install ProxySQL with retry logic
 echo "Installing ProxySQL..."
 if command -v apt-get &> /dev/null; then
-    apt-get install -y proxysql
+    # Retry logic for apt-get install
+    for attempt in 1 2 3; do
+        echo "Install attempt $attempt/3..."
+        if apt-get install -y proxysql; then
+            echo "✓ ProxySQL installed successfully"
+            break
+        else
+            if [ $attempt -lt 3 ]; then
+                echo "⚠ Install failed, retrying in 10 seconds..."
+                sleep 10
+            else
+                echo "✗ ProxySQL installation failed after 3 attempts"
+                exit 1
+            fi
+        fi
+    done
+    
 elif command -v yum &> /dev/null; then
-    yum install -y proxysql
+    # Retry logic for yum install
+    for attempt in 1 2 3; do
+        echo "Install attempt $attempt/3..."
+        if yum install -y proxysql; then
+            echo "✓ ProxySQL installed successfully"
+            break
+        else
+            if [ $attempt -lt 3 ]; then
+                echo "⚠ Install failed, retrying in 10 seconds..."
+                sleep 10
+            else
+                echo "✗ ProxySQL installation failed after 3 attempts"
+                exit 1
+            fi
+        fi
+    done
 fi
 
 # Start ProxySQL service
+echo "Starting ProxySQL service..."
 systemctl start proxysql
 systemctl enable proxysql
 
@@ -268,9 +358,10 @@ sleep 5
 
 # Verify ProxySQL is running
 if systemctl is-active --quiet proxysql; then
-    echo "ProxySQL service started successfully"
+    echo "✓ ProxySQL service started successfully"
 else
-    echo "ERROR: ProxySQL service failed to start"
+    echo "✗ ERROR: ProxySQL service failed to start"
+    systemctl status proxysql
     exit 1
 fi
 
