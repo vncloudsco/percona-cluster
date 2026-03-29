@@ -76,27 +76,27 @@ BANNER
     log_message INFO "Parsing server configuration..."
     parse_server_config
     
-    # Step 5: Show deployment plan
+    # Step 5: Detect firewall (needed for deployment plan display)
+    log_message INFO "Detecting firewall..."
+    detect_firewall
+    
+    # Step 6: Show deployment plan
     show_complete_deployment_plan
     
-    # Step 6: Ask user confirmation
+    # Step 7: Ask user confirmation
     ask_confirmation_final
     
     log_message INFO "╔════════════════════════════════════════════════════════╗"
     log_message INFO "║  STEP 2: Network & Connectivity Checks               ║"
     log_message INFO "╚════════════════════════════════════════════════════════╝"
     
-    # Step 7: Ping all servers
+    # Step 8: Ping all servers
     log_message INFO "Checking connectivity to all servers..."
     ping_all_servers
     
-    # Step 8: Verify SSH connectivity
+    # Step 9: Verify SSH connectivity
     log_message INFO "Verifying SSH connectivity..."
     verify_all_ssh_connectivity
-    
-    # Step 9: Detect firewall
-    log_message INFO "Detecting firewall..."
-    detect_firewall
     
     log_message INFO "╔════════════════════════════════════════════════════════╗"
     log_message INFO "║  STEP 3: Installing MySQL Cluster                    ║"
