@@ -243,38 +243,56 @@ install_packages_remote() {
 #!/bin/bash
 set -e
 
-# Update package lists
+# Install prerequisite packages first
 if command -v apt-get &> /dev/null; then
     apt-get update -y
-    apt-get install -y curl gnupg wget mysql-common libperconaserverclient21
+    apt-get install -y curl gnupg wget
 elif command -v yum &> /dev/null; then
     yum update -y
-    yum install -y curl gnupg wget libperconaserverclient-8.0
+    yum install -y curl gnupg wget
 fi
 
-# Install Percona repository
-if [ ! -f /etc/apt/sources.list.d/percona-release.list ] && \
-   [ ! -f /etc/yum.repos.d/percona-release.repo ]; then
-    curl https://repo.percona.com/apt/percona-release_latest.generic_deb.tar.gz -o /tmp/percona-release.tar.gz
-    cd /tmp && tar -xzf percona-release.tar.gz
+# Install Percona repository BEFORE trying to install specific packages
+if ! [ -f /etc/apt/sources.list.d/percona-release.list ] && \
+   ! [ -f /etc/yum.repos.d/percona-release.repo ]; then
+    echo "Installing Percona repository..."
+    
     if command -v apt-get &> /dev/null; then
-        ./percona-release/percona-release setup -y
+        # For Debian/Ubuntu: use percona-release package
+        if ! command -v percona-release &> /dev/null; then
+            curl -O https://repo.percona.com/apt/percona-release_latest.deb
+            dpkg -i percona-release_latest.deb
+            rm -f percona-release_latest.deb
+        fi
+        percona-release setup -y
+    elif command -v yum &> /dev/null; then
+        # For Rocky/RHEL
+        if ! command -v percona-release &> /dev/null; then
+            rpm -Uhv https://repo.percona.com/yum/percona-release-latest.noarch.rpm
+        fi
     fi
-    rm -rf percona-release*
 fi
 
-# Install Percona XtraDB Cluster
+# Now update again after repo setup
 if command -v apt-get &> /dev/null; then
-    DEBIAN_FRONTEND=noninteractive apt-get install -y percona-server-server percona-xtradb-cluster percona-xtradb-cluster-server
+    apt-get update -y
 elif command -v yum &> /dev/null; then
-    yum install -y percona-server-server percona-xtradb-cluster percona-xtradb-cluster-server
+    yum update -y
 fi
 
-# Install XtraBackup
+# Install Percona XtraDB Cluster and related packages
 if command -v apt-get &> /dev/null; then
-    apt-get install -y percona-xtrabackup-80
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        percona-server-server \
+        percona-xtradb-cluster \
+        percona-xtradb-cluster-server \
+        percona-xtrabackup-80
 elif command -v yum &> /dev/null; then
-    yum install -y percona-xtrabackup-80
+    yum install -y \
+        percona-server-server \
+        percona-xtradb-cluster \
+        percona-xtradb-cluster-server \
+        percona-xtrabackup-80
 fi
 
 echo "Packages installed successfully"
